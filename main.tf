@@ -28,53 +28,25 @@ resource "local_file" "storage_dirs" {
   }
 }
 
-# Build Singularity containers
-resource "null_resource" "build_postgres_container" {
+# Check for container files
+data "local_file" "check_postgres_container" {
+  filename = "${path.module}/postgres.sif"
   depends_on = [local_file.storage_dirs]
-
-  provisioner "local-exec" {
-    command = "singularity build --fakeroot postgres.sif singularity/postgres.def"
-  }
-
-  triggers = {
-    def_file = filemd5("${path.module}/singularity/postgres.def")
-  }
 }
 
-resource "null_resource" "build_n8n_container" {
+data "local_file" "check_n8n_container" {
+  filename = "${path.module}/n8n.sif"
   depends_on = [local_file.storage_dirs]
-
-  provisioner "local-exec" {
-    command = "singularity build --fakeroot n8n.sif singularity/n8n.def"
-  }
-
-  triggers = {
-    def_file = filemd5("${path.module}/singularity/n8n.def")
-  }
 }
 
-resource "null_resource" "build_qdrant_container" {
+data "local_file" "check_qdrant_container" {
+  filename = "${path.module}/qdrant.sif"
   depends_on = [local_file.storage_dirs]
-
-  provisioner "local-exec" {
-    command = "singularity build --fakeroot qdrant.sif singularity/qdrant.def"
-  }
-
-  triggers = {
-    def_file = filemd5("${path.module}/singularity/qdrant.def")
-  }
 }
 
-resource "null_resource" "build_ollama_container" {
+data "local_file" "check_ollama_container" {
+  filename = "${path.module}/ollama.sif"
   depends_on = [local_file.storage_dirs]
-
-  provisioner "local-exec" {
-    command = "singularity build --fakeroot ollama.sif singularity/ollama.def"
-  }
-
-  triggers = {
-    def_file = filemd5("${path.module}/singularity/ollama.def")
-  }
 }
 
 # Variables
@@ -110,7 +82,7 @@ variable "use_gpu" {
 
 # PostgreSQL Instance
 resource "null_resource" "postgres_instance" {
-  depends_on = [local_file.storage_dirs, null_resource.build_postgres_container]
+  depends_on = [local_file.storage_dirs, data.local_file.check_postgres_container]
 
   provisioner "local-exec" {
     command = "singularity instance start --bind ${path.module}/storage/postgres_storage:/var/lib/postgresql/data postgres.sif postgres"
@@ -133,7 +105,7 @@ resource "null_resource" "postgres_wait" {
 
 # n8n Instance
 resource "null_resource" "n8n_instance" {
-  depends_on = [null_resource.postgres_wait, null_resource.build_n8n_container]
+  depends_on = [null_resource.postgres_wait, data.local_file.check_n8n_container]
 
   provisioner "local-exec" {
     command = "singularity instance start --bind ${path.module}/storage/n8n_storage:/home/node/.n8n --bind shared:/data/shared n8n.sif n8n"
@@ -156,7 +128,7 @@ resource "null_resource" "n8n_instance" {
 
 # Qdrant Instance
 resource "null_resource" "qdrant_instance" {
-  depends_on = [local_file.storage_dirs, null_resource.build_qdrant_container]
+  depends_on = [local_file.storage_dirs, data.local_file.check_qdrant_container]
 
   provisioner "local-exec" {
     command = "singularity instance start --bind ${path.module}/storage/qdrant_storage:/qdrant/storage qdrant.sif qdrant"
@@ -170,7 +142,7 @@ resource "null_resource" "qdrant_instance" {
 
 # Ollama Instance
 resource "null_resource" "ollama_instance" {
-  depends_on = [local_file.storage_dirs, null_resource.build_ollama_container]
+  depends_on = [local_file.storage_dirs, data.local_file.check_ollama_container]
 
   provisioner "local-exec" {
     command = var.use_gpu ? (
