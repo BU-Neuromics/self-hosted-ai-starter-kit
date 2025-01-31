@@ -2,7 +2,7 @@ Bootstrap: docker
 From: qdrant/qdrant
 
 %startscript
-    exec /qdrant
+    exec /qdrant/qdrant
 
 %post
     mkdir -p /qdrant/storage
