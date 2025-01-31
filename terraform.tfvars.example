@@ -1,0 +1,6 @@
+postgres_user = "n8n"
+postgres_password = "change_me"
+postgres_db = "n8n"
+n8n_encryption_key = "change_me"
+n8n_jwt_secret = "change_me"
+use_gpu = false  # Set to true to enable GPU support for Ollama 

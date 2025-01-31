@@ -1,0 +1,11 @@
+Bootstrap: docker
+From: ollama/ollama:latest
+
+%environment
+    export OLLAMA_HOST=localhost:11434
+
+%startscript
+    exec ollama serve
+
+%post
+    mkdir -p /root/.ollama 

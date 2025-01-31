@@ -1,0 +1,20 @@
+Bootstrap: docker
+From: n8nio/n8n:latest
+
+%environment
+    export DB_TYPE=postgresdb
+    export DB_POSTGRESDB_HOST=localhost
+    export DB_POSTGRESDB_USER=${POSTGRES_USER}
+    export DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+    export N8N_DIAGNOSTICS_ENABLED=false
+    export N8N_PERSONALIZATION_ENABLED=false
+    export N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+    export N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_JWT_SECRET}
+
+%startscript
+    exec n8n start
+
+%post
+    mkdir -p /home/node/.n8n
+    mkdir -p /data/shared
+    chown -R node:node /home/node/.n8n /data/shared 

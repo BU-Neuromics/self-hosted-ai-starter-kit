@@ -1,0 +1,9 @@
+Bootstrap: docker
+From: qdrant/qdrant
+
+%startscript
+    exec /qdrant
+
+%post
+    mkdir -p /qdrant/storage
+    chmod -R 777 /qdrant/storage 
