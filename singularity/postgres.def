@@ -11,4 +11,6 @@ From: postgres:16-alpine
 
 %post
     mkdir -p /var/lib/postgresql/data
-    chown -R postgres:postgres /var/lib/postgresql/data 
+    chown -R postgres:postgres /var/lib/postgresql/data
+    # Ensure postgres user can write to the data directory
+    chmod 700 /var/lib/postgresql/data 
