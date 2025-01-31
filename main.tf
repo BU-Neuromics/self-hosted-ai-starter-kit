@@ -28,27 +28,6 @@ resource "local_file" "storage_dirs" {
   }
 }
 
-# Check for container files
-data "local_file" "check_postgres_container" {
-  filename = "${path.module}/postgres.sif"
-  depends_on = [local_file.storage_dirs]
-}
-
-data "local_file" "check_n8n_container" {
-  filename = "${path.module}/n8n.sif"
-  depends_on = [local_file.storage_dirs]
-}
-
-data "local_file" "check_qdrant_container" {
-  filename = "${path.module}/qdrant.sif"
-  depends_on = [local_file.storage_dirs]
-}
-
-data "local_file" "check_ollama_container" {
-  filename = "${path.module}/ollama.sif"
-  depends_on = [local_file.storage_dirs]
-}
-
 # Variables
 variable "postgres_user" {
   type = string
@@ -82,7 +61,7 @@ variable "use_gpu" {
 
 # PostgreSQL Instance
 resource "null_resource" "postgres_instance" {
-  depends_on = [local_file.storage_dirs, data.local_file.check_postgres_container]
+  depends_on = [local_file.storage_dirs]
 
   provisioner "local-exec" {
     command = "singularity instance start --bind ${path.module}/storage/postgres_storage:/var/lib/postgresql/data postgres.sif postgres"
@@ -105,7 +84,7 @@ resource "null_resource" "postgres_wait" {
 
 # n8n Instance
 resource "null_resource" "n8n_instance" {
-  depends_on = [null_resource.postgres_wait, data.local_file.check_n8n_container]
+  depends_on = [null_resource.postgres_wait]
 
   provisioner "local-exec" {
     command = "singularity instance start --bind ${path.module}/storage/n8n_storage:/home/node/.n8n --bind shared:/data/shared n8n.sif n8n"
@@ -128,7 +107,7 @@ resource "null_resource" "n8n_instance" {
 
 # Qdrant Instance
 resource "null_resource" "qdrant_instance" {
-  depends_on = [local_file.storage_dirs, data.local_file.check_qdrant_container]
+  depends_on = [local_file.storage_dirs]
 
   provisioner "local-exec" {
     command = "singularity instance start --bind ${path.module}/storage/qdrant_storage:/qdrant/storage qdrant.sif qdrant"
@@ -142,7 +121,7 @@ resource "null_resource" "qdrant_instance" {
 
 # Ollama Instance
 resource "null_resource" "ollama_instance" {
-  depends_on = [local_file.storage_dirs, data.local_file.check_ollama_container]
+  depends_on = [local_file.storage_dirs]
 
   provisioner "local-exec" {
     command = var.use_gpu ? (
