@@ -7,16 +7,16 @@ all: $(CONTAINERS)
 
 # Individual container targets
 postgres.sif: singularity/postgres.def
-	sudo singularity build $@ $<
+	sudo singularity build --force $@ $<
 
 n8n.sif: singularity/n8n.def
-	sudo singularity build $@ $<
+	sudo singularity build --force $@ $<
 
 qdrant.sif: singularity/qdrant.def
-	sudo singularity build $@ $<
+	sudo singularity build --force $@ $<
 
 ollama.sif: singularity/ollama.def
-	sudo singularity build $@ $<
+	sudo singularity build --force $@ $<
 
 # Clean target to remove all containers
 .PHONY: clean
