@@ -7,7 +7,7 @@ From: postgres:16-alpine
     export POSTGRES_DB=${POSTGRES_DB}
 
 %startscript
-    exec postgres -D /var/lib/postgresql/data
+    exec docker-entrypoint.sh postgres
 
 %post
     mkdir -p /var/lib/postgresql/data
