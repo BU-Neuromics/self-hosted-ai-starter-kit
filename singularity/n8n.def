@@ -12,7 +12,7 @@ From: n8nio/n8n:latest
     export N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_JWT_SECRET}
 
 %startscript
-    exec n8n start
+    exec /docker-entrypoint.sh
 
 %post
     mkdir -p /home/node/.n8n
