@@ -13,18 +13,27 @@ terraform {
 }
 
 # Create directories for persistent storage
-resource "local_file" "storage_dirs" {
+resource "null_resource" "storage_dirs" {
   for_each = toset([
     "n8n_storage",
-    "postgres_storage",
+    "n8n_shared",
+    "postgres_storage/data",
+    "postgres_storage/run",
+    "postgres_storage/log",
     "ollama_storage",
     "qdrant_storage"
   ])
-  filename = "${path.module}/storage/${each.value}/.keep"
-  content  = ""
 
   provisioner "local-exec" {
-    command = "mkdir -p ${path.module}/storage/${each.value}"
+    command = <<-EOT
+      mkdir -p ${path.module}/storage/${each.value}
+      chmod 0750 ${path.module}/storage/${each.value}
+    EOT
+  }
+
+  # This ensures the directories are only created once and not deleted on destroy
+  triggers = {
+    dir_path = "${path.module}/storage/${each.value}"
   }
 }
 
@@ -61,79 +70,120 @@ variable "use_gpu" {
 
 # PostgreSQL Instance
 resource "null_resource" "postgres_instance" {
-  depends_on = [local_file.storage_dirs]
+  depends_on = [null_resource.storage_dirs]
 
   provisioner "local-exec" {
-    command = "singularity instance start --bind ${path.module}/storage/postgres_storage:/var/lib/postgresql/data postgres.sif postgres"
+    command = <<-EOT
+      singularity instance start \
+        --containall \
+        --bind ${path.module}/storage/postgres_storage/data:/var/lib/postgresql/data \
+        --bind ${path.module}/storage/postgres_storage/run:/var/run/postgresql \
+        --bind ${path.module}/storage/postgres_storage/log:/var/log/postgresql \
+        --env POSTGRES_DB=${var.postgres_db} \
+        --env POSTGRES_USER=${var.postgres_user} \
+        --env POSTGRES_PASSWORD=${var.postgres_password} \
+        postgres.sif \
+        postgres
+      sleep 3
+    EOT
   }
 
   provisioner "local-exec" {
     when    = destroy
-    command = "singularity instance stop postgres || true"
+    command = "singularity instance list | grep postgres -q && singularity instance stop postgres || true"
   }
 }
 
-# Wait for PostgreSQL to be ready
-resource "null_resource" "postgres_wait" {
-  depends_on = [null_resource.postgres_instance]
+# Create n8n environment file
+resource "local_file" "n8n_env_file" {
+  depends_on = [null_resource.storage_dirs]
+  filename = "${path.module}/storage/env-file.txt"
+  content = <<-EOT
+DB_TYPE=postgresdb
+DB_POSTGRESDB_HOST=localhost
+DB_POSTGRESDB_USER=${var.postgres_user}
+DB_POSTGRESDB_PASSWORD=${var.postgres_password}
+N8N_DIAGNOSTICS_ENABLED=false
+N8N_PERSONALIZATION_ENABLED=false
+N8N_ENCRYPTION_KEY=${var.n8n_encryption_key}
+N8N_USER_MANAGEMENT_JWT_SECRET=${var.n8n_jwt_secret}
+N8N_USER_FOLDER=/home/node/
+N8N_CONFIG_FILES=/home/node/.n8n/config.json
+EOT
+  file_permission = "0600"
+}
 
-  provisioner "local-exec" {
-    command = "sleep 10"  # Simple wait for PostgreSQL to initialize
-  }
+# Create n8n config file
+resource "local_file" "n8n_config_file" {
+  depends_on = [null_resource.storage_dirs]
+  filename = "${path.module}/storage/n8n_storage/config.json"
+  content = jsonencode({
+    "encryptionKey" = var.n8n_encryption_key
+  })
+  file_permission = "0600"
 }
 
 # n8n Instance
 resource "null_resource" "n8n_instance" {
-  depends_on = [null_resource.postgres_wait]
+  depends_on = [null_resource.postgres_instance, local_file.n8n_env_file]
 
   provisioner "local-exec" {
-    command = "singularity instance start --bind ${path.module}/storage/n8n_storage:/home/node/.n8n --bind shared:/data/shared n8n.sif n8n"
+    command = <<-EOT
+      singularity instance start \
+        --containall \
+        --env-file ${path.module}/storage/env-file.txt \
+        --bind ${path.module}/storage/n8n_storage:/home/node/ \
+        --bind ${path.module}/storage/n8n_shared:/data/shared \
+        n8n.sif \
+        n8n
+    EOT
   }
 
   provisioner "local-exec" {
     when    = destroy
-    command = "singularity instance stop n8n || true"
-  }
-
-  # Set environment variables for n8n
-  triggers = {
-    postgres_user     = var.postgres_user
-    postgres_password = var.postgres_password
-    postgres_db       = var.postgres_db
-    encryption_key    = var.n8n_encryption_key
-    jwt_secret        = var.n8n_jwt_secret
+    command = "singularity instance list | grep n8n -q && singularity instance stop n8n || true"
   }
 }
 
 # Qdrant Instance
 resource "null_resource" "qdrant_instance" {
-  depends_on = [local_file.storage_dirs]
+  depends_on = [null_resource.storage_dirs]
 
   provisioner "local-exec" {
-    command = "singularity instance start --bind ${path.module}/storage/qdrant_storage:/qdrant/storage qdrant.sif qdrant"
+    command = <<-EOT
+      singularity instance start \
+        --containall \
+        --bind ${path.module}/storage/qdrant_storage:/qdrant/storage \
+        qdrant.sif \
+        qdrant
+    EOT
   }
 
   provisioner "local-exec" {
     when    = destroy
-    command = "singularity instance stop qdrant || true"
+    command = "singularity instance list | grep qdrant -q && singularity instance stop qdrant || true"
   }
 }
 
 # Ollama Instance
 resource "null_resource" "ollama_instance" {
-  depends_on = [local_file.storage_dirs]
+  depends_on = [null_resource.storage_dirs]
 
   provisioner "local-exec" {
-    command = var.use_gpu ? (
-      "singularity instance start --nv --bind ${path.module}/storage/ollama_storage:/root/.ollama ollama.sif ollama"
-    ) : (
-      "singularity instance start --bind ${path.module}/storage/ollama_storage:/root/.ollama ollama.sif ollama"
-    )
+    command = <<-EOT
+      singularity instance start \
+        --containall \
+        --nv \
+        --bind ${path.module}/storage/ollama_storage:/root/.ollama \
+        --env OLLAMA_MODELS=/root/.ollama/ \
+        ollama.sif \
+        ollama
+    EOT
   }
 
   provisioner "local-exec" {
     when    = destroy
-    command = "singularity instance stop ollama || true"
+    command = "singularity instance list | grep ollama -q && singularity instance stop ollama || true"
   }
 
   triggers = {
@@ -144,7 +194,7 @@ resource "null_resource" "ollama_instance" {
 # Output the storage paths for use in Singularity containers
 output "storage_paths" {
   value = {
-    for dir in local_file.storage_dirs : dir.filename => dirname(dir.filename)
+    for dir in null_resource.storage_dirs : dir.triggers.dir_path => dirname(dir.triggers.dir_path)
   }
 }
 
