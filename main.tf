@@ -21,7 +21,10 @@ resource "null_resource" "storage_dirs" {
     "postgres_storage/run",
     "postgres_storage/log",
     "ollama_storage",
-    "qdrant_storage"
+    "qdrant_storage",
+    "neo4j_storage/data",
+    "neo4j_storage/logs",
+    "neo4j_storage/conf"
   ])
 
   provisioner "local-exec" {
@@ -66,6 +69,12 @@ variable "use_gpu" {
   type    = bool
   default = false
   description = "Whether to enable GPU support for Ollama"
+}
+
+variable "neo4j_password" {
+  type      = string
+  sensitive = true
+  description = "Password for Neo4j admin user"
 }
 
 # PostgreSQL Instance
@@ -191,6 +200,32 @@ resource "null_resource" "ollama_instance" {
   }
 }
 
+# Neo4j Instance
+resource "null_resource" "neo4j_instance" {
+  depends_on = [null_resource.storage_dirs]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      singularity instance start \
+        --containall \
+        --bind ${path.module}/storage/neo4j_storage/data:/var/lib/neo4j/data \
+        --bind ${path.module}/storage/neo4j_storage/logs:/var/lib/neo4j/logs \
+        --bind ${path.module}/storage/neo4j_storage/conf:/var/lib/neo4j/conf \
+        --env NEO4J_AUTH=neo4j/${var.neo4j_password} \
+        --env NEO4J_server_memory_pagecache_size=512M \
+        --env NEO4J_server_memory_heap_initial__size=512M \
+        --env NEO4J_server_memory_heap_max__size=1G \
+        neo4j.sif \
+        neo4j
+    EOT
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "singularity instance list | grep neo4j -q && singularity instance stop neo4j || true"
+  }
+}
+
 # Output the storage paths for use in Singularity containers
 output "storage_paths" {
   value = {
@@ -205,5 +240,6 @@ output "service_endpoints" {
     qdrant   = "http://localhost:6333"
     ollama   = "http://localhost:11434"
     postgres = "postgresql://localhost:5432"
+    neo4j    = "bolt://localhost:7687"
   }
 } 

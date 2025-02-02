@@ -1,0 +1,13 @@
+Bootstrap: docker
+From: neo4j:5.15.0-community
+
+%startscript
+    exec neo4j start-and-wait
+
+%environment
+    export NEO4J_HOME=/var/lib/neo4j
+    export NEO4J_CONF=/var/lib/neo4j/conf
+    export NEO4J_DATA=/var/lib/neo4j/data
+
+%runscript
+    exec "$@" 
