@@ -1,5 +1,5 @@
 # Singularity container build targets
-CONTAINERS = postgres.sif n8n.sif qdrant.sif ollama.sif
+CONTAINERS = postgres.sif n8n.sif qdrant.sif ollama.sif neo4j.sif
 
 # Default target
 .PHONY: all
@@ -16,6 +16,9 @@ qdrant.sif: singularity/qdrant.def
 	sudo singularity build --force $@ $<
 
 ollama.sif: singularity/ollama.def
+	sudo singularity build --force $@ $<
+
+neo4j.sif: singularity/neo4j.def
 	sudo singularity build --force $@ $<
 
 # Clean target to remove all containers
