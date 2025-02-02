@@ -21,7 +21,8 @@ resource "null_resource" "storage_dirs" {
     "postgres_storage/run",
     "postgres_storage/log",
     "ollama_storage",
-    "qdrant_storage",
+    "qdrant_storage/storage",
+    "qdrant_storage/snapshots",
     "neo4j_storage/data",
     "neo4j_storage/logs",
     "neo4j_storage/conf"
@@ -162,7 +163,8 @@ resource "null_resource" "qdrant_instance" {
     command = <<-EOT
       singularity instance start \
         --containall \
-        --bind ${path.module}/storage/qdrant_storage:/qdrant/storage \
+        --bind ${path.module}/storage/qdrant_storage/storage:/qdrant/storage \
+        --bind ${path.module}/storage/qdrant_storage/snapshots:/qdrant/snapshots \
         qdrant.sif \
         qdrant
     EOT
